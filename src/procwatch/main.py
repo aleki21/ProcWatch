@@ -1,19 +1,13 @@
-import os
-
-from procwatch.process import get_process_status
+from procwatch.process import get_process
 
 
 def main():
-    pid = os.getpid()
+    process = get_process(1)
 
-    process = get_process_status(pid)
-
-    print(f"Process: {process['Name']}")
-    print(f"PID: {process['Pid']}")
-    print(f"Parent PID: {process['PPid']}")
-    print(f"State: {process['State']}")
-    print(f"Memory: {process['VmRSS']}")
-    print(f"Threads: {process['Threads']}")
+    print(process)
+    print(process.name)
+    print(process.pid)
+    print(process.memory_kb)
 
 
 if __name__ == "__main__":
