@@ -1,13 +1,15 @@
-from procwatch.display import display_processes
-from procwatch.process import get_processes
+import os
+
+from procwatch.cpu import get_process_cpu_time
 
 
 def main():
-    processes = get_processes()
+    pid = os.getpid()
 
-    print(f"ProcWatch — {len(processes)} processes detected")
+    cpu_time = get_process_cpu_time(pid)
 
-    display_processes(processes)
+    print(f"PID: {pid}")
+    print(f"CPU time: {cpu_time} ticks")
 
 
 if __name__ == "__main__":
