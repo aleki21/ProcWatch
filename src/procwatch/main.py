@@ -1,13 +1,13 @@
-from procwatch.process import get_process
+from procwatch.display import display_processes
+from procwatch.process import get_processes
 
 
 def main():
-    process = get_process(1)
+    processes = get_processes()
 
-    print(process)
-    print(process.name)
-    print(process.pid)
-    print(process.memory_kb)
+    print(f"ProcWatch — {len(processes)} processes detected")
+
+    display_processes(processes)
 
 
 if __name__ == "__main__":

@@ -46,6 +46,21 @@ def get_process(pid: int) -> Process:
         name=status["Name"],
         state=status["State"],
         parent_pid=int(status["PPid"]),
-        memory_kb=int(status["VmRSS"].split()[0]),
-        threads=int(status["Threads"]),
+        memory_kb=int(status.get("VmRSS", "0 kB").split()[0]),
+        threads=int(status.get("Threads", "1")),
     )
+
+def get_processes() -> list[Process]:
+    """Return information about all currently running processes."""
+
+    processes = []
+
+    for pid in get_process_ids():
+        try:
+            process = get_process(pid)
+            processes.append(process)
+        except ProcessLookupError:
+            # The process may have exited between discovery and inspection.
+            continue
+
+    return processes
