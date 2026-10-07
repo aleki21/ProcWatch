@@ -85,3 +85,34 @@ def get_processes_with_cpu_usage(interval: float = 1.0) -> list[Process]:
             continue
 
     return processes
+
+def sort_by_cpu(processes: list[Process]) -> list[Process]:
+    """Return processes sorted by CPU usage."""
+
+    return sorted(
+        processes,
+        key=lambda process: process.cpu_percent,
+        reverse=True,
+    )
+
+
+def sort_by_memory(processes: list[Process]) -> list[Process]:
+    """Return processes sorted by memory usage."""
+
+    return sorted(
+        processes,
+        key=lambda process: process.memory_kb,
+        reverse=True,
+    )
+
+
+def filter_by_name(processes: list[Process], name: str) -> list[Process]:
+    """Return processes whose name contains the given text."""
+
+    name = name.lower()
+
+    return [
+        process
+        for process in processes
+        if name in process.name.lower()
+    ]
