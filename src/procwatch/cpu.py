@@ -13,12 +13,9 @@ def get_process_cpu_time(pid: int) -> int:
     with stat_file.open() as file:
         stat = file.read()
 
-    # The process name can contain spaces, so find the closing ')'.
     closing_paren = stat.rfind(")")
     fields = stat[closing_paren + 2:].split()
 
-    # utime = field 14 -> index 11
-    # stime = field 15 -> index 12
     utime = int(fields[11])
     stime = int(fields[12])
 
@@ -35,7 +32,6 @@ def get_system_cpu_time() -> int:
             if line.startswith("cpu "):
                 fields = line.split()
 
-                # Use the first 8 CPU counters.
                 cpu_times = [int(value) for value in fields[1:9]]
 
                 return sum(cpu_times)
@@ -43,21 +39,67 @@ def get_system_cpu_time() -> int:
     raise RuntimeError("Could not find CPU information in /proc/stat")
 
 
-def get_process_cpu_usage(pid: int, interval: float = 1.0) -> float:
-    """Measure a process's CPU usage over a time interval."""
+def get_cpu_snapshot() -> dict[int, int]:
+    """Return CPU times for all currently running processes."""
 
-    process_start = get_process_cpu_time(pid)
-    system_start = get_system_cpu_time()
+    snapshot = {}
+
+    for entry in PROC_PATH.iterdir():
+        if not entry.name.isdigit():
+            continue
+
+        pid = int(entry.name)
+
+        try:
+            snapshot[pid] = get_process_cpu_time(pid)
+        except (FileNotFoundError, ProcessLookupError):
+            # The process may have exited while we were reading it.
+            continue
+
+    return snapshot
+
+
+def calculate_cpu_usage(
+    previous: dict[int, int],
+    current: dict[int, int],
+    system_delta: int,
+) -> dict[int, float]:
+    """Calculate CPU usage for each process."""
+
+    if system_delta <= 0:
+        return {}
+
+    usage = {}
+
+    for pid, current_time in current.items():
+        if pid not in previous:
+            continue
+
+        process_delta = current_time - previous[pid]
+
+        if process_delta < 0:
+            continue
+
+        usage[pid] = (process_delta / system_delta) * 100
+
+    return usage
+
+
+def measure_cpu_usage(interval: float = 1.0) -> dict[int, float]:
+    """Measure CPU usage for all processes over an interval."""
+
+    previous_processes = get_cpu_snapshot()
+    previous_system = get_system_cpu_time()
 
     time.sleep(interval)
 
-    process_end = get_process_cpu_time(pid)
-    system_end = get_system_cpu_time()
+    current_processes = get_cpu_snapshot()
+    current_system = get_system_cpu_time()
 
-    process_delta = process_end - process_start
-    system_delta = system_end - system_start
+    system_delta = current_system - previous_system
 
-    if system_delta == 0:
-        return 0.0
-
-    return (process_delta / system_delta) * 100
+    return calculate_cpu_usage(
+        previous_processes,
+        current_processes,
+        system_delta,
+    )

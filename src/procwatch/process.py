@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from procwatch.models import Process
+from procwatch.cpu import measure_cpu_usage
 
 
 PROC_PATH = Path("/proc")
@@ -61,6 +62,26 @@ def get_processes() -> list[Process]:
             processes.append(process)
         except ProcessLookupError:
             # The process may have exited between discovery and inspection.
+            continue
+
+    return processes
+
+def get_processes_with_cpu_usage(interval: float = 1.0) -> list[Process]:
+    """Return processes with CPU usage measured over an interval."""
+
+    cpu_usage = measure_cpu_usage(interval)
+
+    processes = []
+
+    for pid, cpu_percent in cpu_usage.items():
+        try:
+            process = get_process(pid)
+            process.cpu_percent = cpu_percent
+            processes.append(process)
+
+        except (ProcessLookupError, KeyError):
+            # Process may have exited between CPU measurement
+            # and reading its information.
             continue
 
     return processes

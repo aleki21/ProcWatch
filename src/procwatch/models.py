@@ -9,3 +9,4 @@ class Process:
     parent_pid: int
     memory_kb: int
     threads: int
+    cpu_percent: float = 0.0
