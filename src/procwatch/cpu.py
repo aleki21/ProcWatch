@@ -1,3 +1,5 @@
+
+from dataclasses import dataclass
 from pathlib import Path
 import time
 
@@ -5,8 +7,17 @@ import time
 PROC_PATH = Path("/proc")
 
 
+@dataclass
+class CpuSnapshot:
+    """CPU counters captured at a specific point in time."""
+
+    system_total: int
+    system_idle: int
+    processes: dict[int, int]
+
+
 def get_process_cpu_time(pid: int) -> int:
-    """Return the total CPU time used by a process in clock ticks."""
+    """Return total CPU time used by a process in clock ticks."""
 
     stat_file = PROC_PATH / str(pid) / "stat"
 
@@ -22,8 +33,8 @@ def get_process_cpu_time(pid: int) -> int:
     return utime + stime
 
 
-def get_system_cpu_time() -> int:
-    """Return the total system CPU time in clock ticks."""
+def get_system_cpu_snapshot() -> tuple[int, int]:
+    """Return total and idle system CPU ticks."""
 
     stat_file = PROC_PATH / "stat"
 
@@ -31,18 +42,22 @@ def get_system_cpu_time() -> int:
         for line in file:
             if line.startswith("cpu "):
                 fields = line.split()
-
                 cpu_times = [int(value) for value in fields[1:9]]
 
-                return sum(cpu_times)
+                total = sum(cpu_times)
+                idle = cpu_times[3] + cpu_times[4]
+
+                return total, idle
 
     raise RuntimeError("Could not find CPU information in /proc/stat")
 
 
-def get_cpu_snapshot() -> dict[int, int]:
-    """Return CPU times for all currently running processes."""
+def get_cpu_snapshot() -> CpuSnapshot:
+    """Capture system and process CPU counters."""
 
-    snapshot = {}
+    system_total, system_idle = get_system_cpu_snapshot()
+
+    processes = {}
 
     for entry in PROC_PATH.iterdir():
         if not entry.name.isdigit():
@@ -51,55 +66,61 @@ def get_cpu_snapshot() -> dict[int, int]:
         pid = int(entry.name)
 
         try:
-            snapshot[pid] = get_process_cpu_time(pid)
+            processes[pid] = get_process_cpu_time(pid)
         except (FileNotFoundError, ProcessLookupError):
-            # The process may have exited while we were reading it.
             continue
 
-    return snapshot
+    return CpuSnapshot(
+        system_total=system_total,
+        system_idle=system_idle,
+        processes=processes,
+    )
 
 
 def calculate_cpu_usage(
-    previous: dict[int, int],
-    current: dict[int, int],
-    system_delta: int,
-) -> dict[int, float]:
-    """Calculate CPU usage for each process."""
+    previous: CpuSnapshot,
+    current: CpuSnapshot,
+) -> tuple[float, dict[int, float]]:
+    """Calculate system and individual process CPU usage."""
+
+    system_delta = current.system_total - previous.system_total
 
     if system_delta <= 0:
-        return {}
+        return 0.0, {}
 
-    usage = {}
+    idle_delta = current.system_idle - previous.system_idle
 
-    for pid, current_time in current.items():
-        if pid not in previous:
+    system_usage = (
+        (system_delta - idle_delta) / system_delta
+    ) * 100
+
+    process_usage = {}
+
+    for pid, current_time in current.processes.items():
+        if pid not in previous.processes:
             continue
 
-        process_delta = current_time - previous[pid]
+        process_delta = current_time - previous.processes[pid]
 
         if process_delta < 0:
             continue
 
-        usage[pid] = (process_delta / system_delta) * 100
+        process_usage[pid] = (
+            process_delta / system_delta
+        ) * 100
 
-    return usage
+    return system_usage, process_usage
 
 
-def measure_cpu_usage(interval: float = 1.0) -> dict[int, float]:
-    """Measure CPU usage for all processes over an interval."""
+def measure_cpu_usage(
+    interval: float = 1.0,
+) -> tuple[float, dict[int, float]]:
+    """Measure system and process CPU usage over an interval."""
 
-    previous_processes = get_cpu_snapshot()
-    previous_system = get_system_cpu_time()
+    previous = get_cpu_snapshot()
 
     time.sleep(interval)
 
-    current_processes = get_cpu_snapshot()
-    current_system = get_system_cpu_time()
+    current = get_cpu_snapshot()
 
-    system_delta = current_system - previous_system
-
-    return calculate_cpu_usage(
-        previous_processes,
-        current_processes,
-        system_delta,
-    )
+    return calculate_cpu_usage(previous, current)

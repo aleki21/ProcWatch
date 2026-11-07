@@ -1,12 +1,6 @@
 import argparse
 
-from procwatch.display import display_processes
-from procwatch.process import (
-    filter_by_name,
-    get_processes_with_cpu_usage,
-    sort_by_cpu,
-    sort_by_memory,
-)
+from procwatch.monitor import run_monitor
 
 
 def parse_arguments():
@@ -36,31 +30,28 @@ def parse_arguments():
         help="Filter processes by name",
     )
 
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=2.0,
+        help="Seconds between measurements",
+    )
+
     return parser.parse_args()
 
 
 def main():
     args = parse_arguments()
 
-    print("Measuring CPU usage...")
-
-    processes = get_processes_with_cpu_usage()
-
-    if args.name:
-        processes = filter_by_name(processes, args.name)
-
-    if args.sort == "cpu":
-        processes = sort_by_cpu(processes)
-    else:
-        processes = sort_by_memory(processes)
-
-    print()
-    print(f"ProcWatch — {len(processes)} processes")
-
-    display_processes(
-        processes,
-        limit=args.limit,
-    )
+    try:
+        run_monitor(
+            interval=args.interval,
+            sort_by=args.sort,
+            limit=args.limit,
+            name=args.name,
+        )
+    except KeyboardInterrupt:
+        print("\nProcWatch stopped.")
 
 
 if __name__ == "__main__":
