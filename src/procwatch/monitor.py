@@ -34,7 +34,7 @@ def run_monitor(
                 process.cpu_percent = cpu_percent
                 processes.append(process)
 
-            except (ProcessLookupError, KeyError):
+            except (ProcessLookupError, FileNotFoundError, KeyError):
                 continue
 
         if name:

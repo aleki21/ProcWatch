@@ -51,6 +51,7 @@ def get_process(pid: int) -> Process:
         threads=int(status.get("Threads", "1")),
     )
 
+
 def get_processes() -> list[Process]:
     """Return information about all currently running processes."""
 
@@ -60,16 +61,18 @@ def get_processes() -> list[Process]:
         try:
             process = get_process(pid)
             processes.append(process)
-        except ProcessLookupError:
-            # The process may have exited between discovery and inspection.
+
+        except (ProcessLookupError, FileNotFoundError):
+            # The process may have exited during inspection.
             continue
 
     return processes
 
+
 def get_processes_with_cpu_usage(interval: float = 1.0) -> list[Process]:
     """Return processes with CPU usage measured over an interval."""
 
-    cpu_usage = measure_cpu_usage(interval)
+    system_cpu, cpu_usage = measure_cpu_usage(interval)
 
     processes = []
 
@@ -79,12 +82,12 @@ def get_processes_with_cpu_usage(interval: float = 1.0) -> list[Process]:
             process.cpu_percent = cpu_percent
             processes.append(process)
 
-        except (ProcessLookupError, KeyError):
-            # Process may have exited between CPU measurement
-            # and reading its information.
+        except (ProcessLookupError, FileNotFoundError, KeyError):
+            # The process may have exited during inspection.
             continue
 
     return processes
+
 
 def sort_by_cpu(processes: list[Process]) -> list[Process]:
     """Return processes sorted by CPU usage."""
